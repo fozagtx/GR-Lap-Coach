@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to save session' }, { status: 500 });
     }
 
-    if (!process.env.NEXT_OPENAI_API_KEY) {
+    if (!process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
       return NextResponse.json(
         {
           sessionId: sessionData.id,

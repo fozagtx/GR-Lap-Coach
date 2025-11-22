@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (!process.env.NEXT_OPENAI_API_KEY) {
+    if (!process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     const openai = new OpenAI({
-      apiKey: process.env.NEXT_OPENAI_API_KEY,
+      apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
     });
 
     const contextMessage = `

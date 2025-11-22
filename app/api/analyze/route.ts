@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     const perfectLap = synthesizePerfectLap(trackId);
 
-    if (!process.env.NEXT_OPENAI_API_KEY) {
+    if (!process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 500 }
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const openai = new OpenAI({
-      apiKey: process.env.NEXT_OPENAI_API_KEY,
+      apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
     });
 
     const summaryText = `
