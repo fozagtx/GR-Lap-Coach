@@ -48,6 +48,27 @@ function parseTelemetryCSV(csvContent: string): TelemetryRow[] {
     console.error('  Found columns:', headers.join(', '));
     console.error('  Missing columns:', missingColumns.join(', '));
 
+    // Detect if this looks like a race results file
+    const raceResultsIndicators = ['POSITION', 'NUMBER', 'STATUS', 'LAPS', 'TOTAL_TIME', 'GAP_FIRST'];
+    const matchedIndicators = raceResultsIndicators.filter(indicator =>
+      headers.some(h => h.toUpperCase() === indicator)
+    );
+
+    if (matchedIndicators.length >= 3) {
+      throw new Error(
+        `The uploaded CSV appears to be a race results/standings file, not telemetry data.\n\n` +
+        `This application requires RAW TELEMETRY DATA from your car's ECU with these columns:\n` +
+        `  - timestamp (Time on ECU)\n` +
+        `  - Laptrigger_lapdist_dls (Distance from start/finish in meters)\n` +
+        `  - Speed (Vehicle speed in km/h)\n` +
+        `  - Steering_Angle (Steering input)\n` +
+        `  - pbrake_f (Front brake pressure)\n` +
+        `  - aps (Accelerator pedal position)\n\n` +
+        `Your file has: ${headers.join(', ')}\n\n` +
+        `Please upload the telemetry data file from your car's data logger, not the race results file.`
+      );
+    }
+
     // Try to find similar column names (case-insensitive)
     const suggestions: string[] = [];
     for (const missing of missingColumns) {
@@ -60,12 +81,20 @@ function parseTelemetryCSV(csvContent: string): TelemetryRow[] {
     if (suggestions.length > 0) {
       console.error('Suggestions:');
       suggestions.forEach(s => console.error(s));
+
+      throw new Error(
+        `CSV file has incorrect column names (case-sensitive):\n` +
+        suggestions.join('\n') + '\n\n' +
+        `Expected: ${requiredColumns.join(', ')}\n` +
+        `Found: ${headers.join(', ')}`
+      );
     }
 
     throw new Error(
-      `CSV file is missing required columns: ${missingColumns.join(', ')}. ` +
-      `Found columns: ${headers.join(', ')}. ` +
-      `Column names are case-sensitive.`
+      `CSV file is missing required columns: ${missingColumns.join(', ')}.\n\n` +
+      `Required columns:\n  - ${requiredColumns.join('\n  - ')}\n\n` +
+      `Found columns:\n  - ${headers.join('\n  - ')}\n\n` +
+      `Please ensure you're uploading a telemetry data file with the correct format.`
     );
   }
 
