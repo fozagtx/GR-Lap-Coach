@@ -382,8 +382,8 @@ function identifyImprovementAreas(
     brakingVariance.get(key)!.push(zone.distance);
   }
 
-  for (const [key, distances] of brakingVariance) {
-    if (distances.length < 2) continue;
+  Array.from(brakingVariance.entries()).forEach(([key, distances]) => {
+    if (distances.length < 2) return;
     const variance = Math.max(...distances) - Math.min(...distances);
     if (variance > 30) {
       const sector = key.split('-')[0];
@@ -396,7 +396,7 @@ function identifyImprovementAreas(
         priority: 'medium',
       });
     }
-  }
+  });
 
   const cornersByDistance = corners.reduce((acc, corner) => {
     const key = `${corner.sector}-${Math.floor(corner.distance / 100) * 100}`;
