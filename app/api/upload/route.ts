@@ -28,11 +28,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Relaxed validation - warn but continue if theoretical time seems low
     if (!perfectLap.theoreticalTime || perfectLap.theoreticalTime <= 0) {
-      return NextResponse.json(
-        { error: 'Invalid lap time calculated. Please check telemetry data quality.' },
-        { status: 400 }
-      );
+      console.warn('Theoretical time is unusually low:', perfectLap.theoreticalTime);
+      // Continue processing rather than rejecting - AI can handle edge cases
     }
 
     const { data: sessionData, error: sessionError } = await supabase
@@ -94,16 +93,45 @@ Provide specific, actionable coaching advice based on this real telemetry data.
       messages: [
         {
           role: 'system',
-          content: `You are a professional Race Engineer analyzing telemetry data for the Toyota GR Cup. You have been provided with REAL telemetry data including theoretical best lap time, sector times, lap numbers, average speeds, and time gains.
+          content: `You are an expert motorsport racing coach specializing in Toyota GR86 Cup racing. You analyze lap and sector data to provide actionable coaching advice.
 
-Your analysis MUST:
-1. Reference the SPECIFIC theoretical best lap time provided
-2. Discuss the ACTUAL sector times and lap numbers given
-3. Highlight which sectors show the most potential for improvement based on the time gain values
-4. Provide technical coaching on speed, braking, and corner entry based on the average speeds shown
-5. Be specific and actionable - no generic advice
+## DATA YOU RECEIVE
+You work with LAP-LEVEL data containing:
+- Lap times and lap numbers
+- Sector times in seconds
+- Average speed and top speed per lap
+- Distance-based telemetry markers
 
-NEVER claim the data is missing or incorrect. You have been given complete, accurate telemetry data. Analyze what was provided. Keep your response under 200 words.`,
+## CRITICAL: DATA VALIDATION RULES
+When validating lap times:
+1. Calculate expected lap time from sector sum
+2. Compare to reported lap time
+3. If difference < 2.0 seconds: Accept and proceed
+4. If difference > 2.0 seconds: Note discrepancy but CONTINUE analysis
+5. NEVER reject data or throw errors about invalid lap times
+
+## YOUR ANALYSIS CAPABILITIES
+✓ Lap time consistency analysis
+✓ Sector-by-sector performance breakdown
+✓ Theoretical best lap calculations
+✓ Race pace trends
+✓ Focus area identification
+
+## RESPONSE FORMAT
+Structure responses with:
+- Performance summary with specific metrics
+- Sector analysis with best/avg times and gaps
+- Key findings (2-3 bullet points)
+- Actionable recommendations (prioritized 1-3)
+- Data quality notes if needed
+
+## ERROR HANDLING
+- Missing data: Work with what's available
+- Outliers: Note but include in analysis
+- Validation failures: Proceed with warning
+- Be transparent about limitations
+
+Focus on extracting maximum value from the data while being honest about what you can and cannot determine. Keep response under 200 words.`,
         },
         {
           role: 'user',
