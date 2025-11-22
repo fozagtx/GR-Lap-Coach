@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Mic, Zap, Upload, TrendingUp, Activity, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
+import { Search, Mic, Zap, Upload, TrendingUp, Activity, ChevronDown, ChevronRight, ArrowRight, RefreshCw } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { FileUpload } from '@/components/FileUpload';
 import { ChatInterface } from '@/components/ChatInterface';
@@ -42,6 +42,13 @@ export default function Home() {
   const handleClearFile = () => {
     setSelectedFile(null);
     setError(null);
+  };
+
+  const handleStartOver = () => {
+    setResult(null);
+    setSelectedFile(null);
+    setError(null);
+    setLoading(false);
   };
 
   const handleUploadAndAnalyze = async () => {
@@ -227,7 +234,7 @@ export default function Home() {
       ) : (
         <div className="pt-24 pb-12 min-h-screen">
           <div className="container-custom">
-            <div className="mb-8">
+            <div className="mb-8 flex gap-4">
               <Button
                 onClick={() => setShowAnalysis(false)}
                 variant="outline"
@@ -235,6 +242,16 @@ export default function Home() {
               >
                 ← Back to Home
               </Button>
+              {result && (
+                <Button
+                  onClick={handleStartOver}
+                  variant="outline"
+                  className="text-[#89D3FF] hover:text-white transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Start Over
+                </Button>
+              )}
             </div>
 
             {!result ? (
