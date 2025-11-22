@@ -31,7 +31,7 @@ export function StreamingAnalysis({ analysis }: StreamingAnalysisProps) {
   const cleanedText = displayedText.replace(/\*\*/g, '').replace(/\*/g, '');
 
   return (
-    <Card className="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg">
+    <Card variant="gradient" className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg">
       <CardContent className="pt-6">
         <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />

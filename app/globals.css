@@ -314,6 +314,38 @@
     --border-color-2: hsla(320, 50%, 90%, 0.75);
   }
 
+  .gradient-card {
+    @apply relative;
+    transition:
+      --border-angle 0.5s,
+      --border-color-1 0.5s,
+      --border-color-2 0.5s;
+  }
+
+  .gradient-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(
+      var(--border-angle),
+      var(--border-color-1),
+      var(--border-color-2)
+    );
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    pointer-events: none;
+  }
+
+  .gradient-card:hover {
+    --border-angle: 190deg;
+    --border-color-1: hsla(340, 78%, 90%, 0.3);
+    --border-color-2: hsla(340, 75%, 90%, 0.8);
+  }
+
   .btn-primary {
     @apply px-8 py-3 rounded-full bg-[#5145F6] hover:bg-[#3940FF] text-white font-semibold transition-all duration-300 hover:shadow-lg hover:shadow-[#5145F6]/50;
   }
