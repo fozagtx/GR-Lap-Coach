@@ -90,9 +90,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contextMessage = `
-You are analyzing telemetry data for this session:
-
+    const telemetryContext = `
 Track: ${sessionData.track_name}
 Theoretical Best Lap: ${formatLapTime(sessionData.theoretical_time)}
 
@@ -103,14 +101,15 @@ ${sessionData.sector_stats
       `- ${stat.sectorName}: ${formatLapTime(stat.bestTime ?? 0)} (Lap ${stat.lapNumber ?? 0}) | Avg Speed: ${(stat.avgSpeed ?? 0).toFixed(1)} km/h | Time Gain: ${(stat.timeGain ?? 0).toFixed(3)}s`
   )
   .join('\n')}
-
-The driver is asking questions about their performance. Use this telemetry context to provide specific, actionable coaching advice.
     `.trim();
 
     const messages: any[] = [
       {
         role: 'system',
         content: `You are an expert motorsport racing coach for the Toyota GR86 Cup. You analyze telemetry data and provide personalized coaching.
+
+## CURRENT SESSION DATA
+${telemetryContext}
 
 ## YOUR ROLE
 - Answer specific questions about lap times, sectors, and technique
@@ -130,10 +129,6 @@ The driver is asking questions about their performance. Use this telemetry conte
 - Prioritize practical, implementable recommendations
 - Use specific metrics and numbers when discussing performance
 - Provide encouragement while identifying clear areas for improvement`,
-      },
-      {
-        role: 'user',
-        content: contextMessage,
       },
     ];
 
