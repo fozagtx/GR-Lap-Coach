@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Mic, Zap, Upload, TrendingUp, Activity, ChevronDown, ChevronRight, ArrowRight, RefreshCw } from 'lucide-react';
+import { Search, Mic, Zap, Upload, TrendingUp, Activity, ChevronDown, ChevronRight, ArrowRight, RefreshCw, AlertCircle, Target, CheckCircle2 } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { FileUpload } from '@/components/FileUpload';
 import { ChatInterface } from '@/components/ChatInterface';
@@ -23,6 +23,22 @@ interface AnalysisResult {
     lapNumber: number;
     timeGain: number;
     avgSpeed: number;
+  }>;
+  consistency?: {
+    avgLapTime: number;
+    bestLapTime: number;
+    worstLapTime: number;
+    stdDeviation: number;
+    lapTimeVariation: number[];
+    consistencyScore: number;
+  };
+  improvementAreas?: Array<{
+    area: string;
+    sector: string;
+    timeLoss: number;
+    description: string;
+    recommendation: string;
+    priority: 'high' | 'medium' | 'low';
   }>;
 }
 
@@ -99,6 +115,8 @@ export default function Home() {
   const features = [
     { title: 'Perfect Lap Synthesis', desc: 'Automatically combines the fastest sectors from your data' },
     { title: 'AI Race Engineer', desc: 'Get personalized coaching insights powered by GPT-4o' },
+    { title: 'Smart Improvement Analysis', desc: 'Identifies specific areas for improvement with priority rankings and actionable recommendations' },
+    { title: 'Consistency Scoring', desc: 'Analyzes lap-to-lap consistency and identifies performance patterns' },
     { title: 'Smart Drafting Filter', desc: 'Filters out laps affected by slipstream automatically' },
     { title: 'Real-time Chat', desc: 'Ask questions and get instant feedback on your performance' },
   ];
@@ -330,6 +348,105 @@ export default function Home() {
                     </Card>
                   ))}
                 </div>
+
+                {result.consistency && (
+                  <Card className="bg-gradient-to-br from-gray-900 to-gray-800 border-2 border-gray-700 rounded-2xl shadow-lg mb-12">
+                    <CardContent className="p-6">
+                      <h3 className="text-xl md:text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                        <Activity className="w-6 h-6 text-cyan-400" />
+                        Consistency Analysis
+                      </h3>
+                      <div className="grid md:grid-cols-4 gap-6">
+                        <div className="text-center">
+                          <div className="text-3xl font-bold text-cyan-400 mb-2">
+                            {result.consistency.consistencyScore.toFixed(0)}
+                          </div>
+                          <div className="text-sm text-gray-400">Consistency Score</div>
+                          <div className="text-xs text-gray-500 mt-1">out of 100</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-green-400 mb-2">
+                            {formatLapTime(result.consistency.bestLapTime)}
+                          </div>
+                          <div className="text-sm text-gray-400">Best Lap</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-blue-400 mb-2">
+                            {formatLapTime(result.consistency.avgLapTime)}
+                          </div>
+                          <div className="text-sm text-gray-400">Average Lap</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xl font-bold text-orange-400 mb-2">
+                            ±{result.consistency.stdDeviation.toFixed(3)}s
+                          </div>
+                          <div className="text-sm text-gray-400">Std Deviation</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {result.improvementAreas && result.improvementAreas.length > 0 && (
+                  <Card className="bg-gray-900 border-2 border-gray-700 rounded-2xl shadow-lg mb-12">
+                    <CardContent className="p-6">
+                      <h3 className="text-xl md:text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                        <Target className="w-6 h-6 text-yellow-400" />
+                        Priority Improvement Areas
+                      </h3>
+                      <div className="space-y-4">
+                        {result.improvementAreas.map((area, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-gray-800 rounded-lg p-4 border-l-4 transition-all hover:bg-gray-750"
+                            style={{
+                              borderLeftColor:
+                                area.priority === 'high'
+                                  ? '#EF4444'
+                                  : area.priority === 'medium'
+                                  ? '#F59E0B'
+                                  : '#10B981',
+                            }}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="px-2 py-1 rounded text-xs font-bold uppercase"
+                                  style={{
+                                    backgroundColor:
+                                      area.priority === 'high'
+                                        ? '#EF444420'
+                                        : area.priority === 'medium'
+                                        ? '#F59E0B20'
+                                        : '#10B98120',
+                                    color:
+                                      area.priority === 'high'
+                                        ? '#EF4444'
+                                        : area.priority === 'medium'
+                                        ? '#F59E0B'
+                                        : '#10B981',
+                                  }}
+                                >
+                                  {area.priority}
+                                </span>
+                                <h4 className="font-bold text-white">{area.area}</h4>
+                                <span className="text-sm text-gray-400">({area.sector})</span>
+                              </div>
+                              <div className="text-lg font-bold text-red-400">
+                                -{area.timeLoss.toFixed(3)}s
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-300 mb-2">{area.description}</p>
+                            <div className="flex items-start gap-2 bg-gray-900 rounded p-3 mt-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                              <p className="text-sm text-gray-300">{area.recommendation}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Card className="bg-gray-900 border-2 border-gray-700">
                   <CardContent className="p-4 md:p-8">
