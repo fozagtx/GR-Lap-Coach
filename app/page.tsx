@@ -301,7 +301,16 @@ export default function Home() {
                   <div className="text-4xl md:text-5xl lg:text-6xl font-bold text-gradient mb-2">
                     {formatLapTime(result.theoreticalTime)}
                   </div>
-                  <p className="text-base md:text-lg text-gray-300">Theoretical Best Lap Time</p>
+                  <p className="text-base md:text-lg text-gray-300 mb-6">Theoretical Best Lap Time</p>
+                  <Button
+                    onClick={handleStartOver}
+                    size="lg"
+                    variant="outline"
+                    className="text-[#89D3FF] hover:text-white transition-colors border-2 border-[#89D3FF] hover:border-white"
+                  >
+                    <Upload className="w-5 h-5 mr-2" />
+                    Start Over - Upload New CSV
+                  </Button>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6 mb-12">
