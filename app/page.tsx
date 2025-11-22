@@ -7,7 +7,6 @@ import { FileUpload } from '@/components/FileUpload';
 import { ChatInterface } from '@/components/ChatInterface';
 import { StreamingAnalysis } from '@/components/StreamingAnalysis';
 import { Button } from '@/components/ui/button';
-import { GradientButton } from '@/components/ui/gradient-button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -124,20 +123,20 @@ export default function Home() {
                       </p>
 
                       <div className="flex flex-col sm:flex-row gap-4">
-                        <GradientButton
+                        <Button
                           onClick={() => setShowAnalysis(true)}
                           size="lg"
                         >
                           <Upload className="w-5 h-5 mr-2" />
                           Start Analysis
-                        </GradientButton>
-                        <GradientButton
+                        </Button>
+                        <Button
                           variant="variant"
                           size="lg"
                         >
                           View Demo
                           <ArrowRight className="w-5 h-5 ml-2" />
-                        </GradientButton>
+                        </Button>
                       </div>
 
                       <div className="mt-8 flex flex-wrap gap-6 text-xs md:text-sm text-gray-400">
@@ -181,7 +180,7 @@ export default function Home() {
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
                     Outperform the <span className="italic font-light">competition</span> with V3
                   </h2>
-                  <button className="btn-secondary text-sm md:text-base">TRY IT OUT</button>
+                  <Button variant="variant" size="lg" className="text-sm md:text-base">TRY IT OUT</Button>
                 </div>
 
                 <div className="space-y-4">
@@ -257,10 +256,10 @@ export default function Home() {
                 )}
 
                 <div className="flex justify-center">
-                  <button
+                  <Button
                     onClick={handleUploadAndAnalyze}
                     disabled={loading || !selectedFile}
-                    className="btn-primary text-lg px-12 py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                    size="lg"
                   >
                     {loading ? (
                       <>
@@ -273,7 +272,7 @@ export default function Home() {
                         Analyze Telemetry
                       </>
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (

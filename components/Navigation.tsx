@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Zap } from 'lucide-react';
-import { GradientButton } from '@/components/ui/gradient-button';
+import { Button } from '@/components/ui/button';
 
 interface NavigationProps {
   onLaunchApp: () => void;
@@ -34,9 +34,9 @@ export function Navigation({ onLaunchApp }: NavigationProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <GradientButton onClick={onLaunchApp} size="sm">
+            <Button onClick={onLaunchApp} size="sm">
               Launch App
-            </GradientButton>
+            </Button>
           </div>
         </div>
       </div>

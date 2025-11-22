@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { GradientButton } from '@/components/ui/gradient-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -222,14 +221,14 @@ export function ChatInterface({ sessionId }: ChatInterfaceProps) {
               disabled={isLoading}
               className="flex-1 bg-gray-900 border-gray-600 text-white placeholder:text-gray-400 focus:border-cyan-500 focus:ring-cyan-500"
             />
-            <GradientButton
+            <Button
               onClick={handleSend}
               disabled={isLoading || !input.trim()}
               size="icon"
               className="flex-shrink-0"
             >
               <Send className="w-4 h-4" />
-            </GradientButton>
+            </Button>
           </div>
           <p className="text-xs text-gray-400 mt-2 hidden sm:block">
             Ask about braking points, corner speeds, or sector improvements
