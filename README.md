@@ -109,6 +109,264 @@ The application uses these hardcoded sectors for Circuit of the Americas:
 
 8. **Interactive Coaching**: Continue the conversation with the AI, asking follow-up questions. The AI has full context of your telemetry data and provides specific, actionable advice
 
+## Architecture
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph Client["Client (Browser)"]
+        UI[React UI Components]
+        FileUpload[File Upload Component]
+        Chart[Recharts Visualization]
+        Chat[Chat Interface]
+    end
+
+    subgraph Server["Next.js Server"]
+        UploadAPI["/api/upload"]
+        ChatAPI["/api/chat"]
+        HistoryAPI["/api/chat/history"]
+        TelemetryEngine["Telemetry Engine<br/>(CSV Processing)"]
+    end
+
+    subgraph External["External Services"]
+        Supabase[(Supabase PostgreSQL)]
+        OpenAI[OpenAI GPT-4o]
+    end
+
+    FileUpload -->|CSV File| UploadAPI
+    UploadAPI --> TelemetryEngine
+    TelemetryEngine -->|Parse & Analyze| TelemetryEngine
+    UploadAPI -->|Store Session| Supabase
+    UploadAPI -->|Generate Analysis| OpenAI
+    UploadAPI -->|chartData, stats| Chart
+
+    Chat -->|User Message| ChatAPI
+    ChatAPI -->|Query Context| Supabase
+    ChatAPI -->|Generate Response| OpenAI
+    ChatAPI -->|Store Message| Supabase
+    ChatAPI -->|Response| Chat
+
+    UI -->|Load History| HistoryAPI
+    HistoryAPI -->|Fetch Messages| Supabase
+    HistoryAPI -->|Messages| UI
+
+    style Client fill:#1a1a2e
+    style Server fill:#16213e
+    style External fill:#0f3460
+```
+
+### Data Flow: CSV Upload to Graph Display
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FileUpload
+    participant UploadAPI as /api/upload
+    participant Parser as PapaParse
+    participant Engine as Telemetry Engine
+    participant DB as Supabase
+    participant AI as OpenAI GPT-4o
+    participant Chart as Recharts Graph
+
+    User->>FileUpload: Upload CSV file
+    FileUpload->>UploadAPI: POST FormData (file, trackName)
+
+    UploadAPI->>UploadAPI: Validate file type (.csv)
+    UploadAPI->>Parser: Parse CSV content
+    Parser-->>Engine: TelemetryRow[]
+
+    Note over Engine: Lap Detection
+    Engine->>Engine: detectLaps()<br/>(distance 3000→200 threshold)
+
+    Note over Engine: Sector Extraction
+    Engine->>Engine: extractSector()<br/>(S1: 0-1000m, S2: 1000-2200m, etc)
+
+    Note over Engine: Drafting Filter
+    Engine->>Engine: isDrafting()<br/>(filter speed >162 km/h in corners)
+
+    Note over Engine: Perfect Lap Synthesis
+    Engine->>Engine: Find best sector per section
+    Engine->>Engine: Generate chartData[]<br/>{distance, speed, sector}
+    Engine-->>UploadAPI: PerfectLapResult<br/>(chartData, sectorStats, theoreticalTime)
+
+    UploadAPI->>DB: INSERT telemetry_sessions<br/>(chart_data, sector_stats, theoretical_time)
+    DB-->>UploadAPI: sessionId
+
+    UploadAPI->>AI: Generate coaching analysis<br/>(sector stats, lap time)
+    AI-->>UploadAPI: AI insights
+
+    UploadAPI->>DB: INSERT chat_messages<br/>(AI analysis)
+
+    UploadAPI-->>FileUpload: AnalysisResult<br/>(sessionId, chartData, aiAnalysis)
+
+    FileUpload->>Chart: Render LineChart(chartData)
+    Chart->>Chart: XAxis(distance)<br/>YAxis(speed)<br/>Line(speed)
+    Chart-->>User: Display Speed Trace Graph
+```
+
+### Component Architecture
+
+```mermaid
+graph TD
+    subgraph App["app/page.tsx - Main Application"]
+        State[State Management]
+        UploadSection[Upload Section]
+        ResultSection[Results Section]
+    end
+
+    subgraph Components["React Components"]
+        Navigation[Navigation]
+        FileUploadComp[FileUpload Component]
+        SectorCards[Sector Stats Cards]
+        SpeedChart[Speed Trace Chart<br/>Recharts]
+        StreamingAnalysis[StreamingAnalysis<br/>AI Insights]
+        ChatInterface[ChatInterface<br/>Interactive Q&A]
+    end
+
+    subgraph UI["UI Components (shadcn/ui)"]
+        Button[Button]
+        Card[Card]
+        Alert[Alert]
+    end
+
+    App --> Navigation
+    UploadSection --> FileUploadComp
+    UploadSection --> Button
+    UploadSection --> Alert
+
+    ResultSection --> SectorCards
+    ResultSection --> SpeedChart
+    ResultSection --> StreamingAnalysis
+    ResultSection --> ChatInterface
+
+    FileUploadComp --> Card
+    SectorCards --> Card
+    SpeedChart --> Card
+    StreamingAnalysis --> Card
+    ChatInterface --> Card
+
+    State -.->|selectedFile| FileUploadComp
+    State -.->|result| ResultSection
+    State -.->|loading| Button
+    State -.->|error| Alert
+
+    style App fill:#2d4263
+    style Components fill:#1a1a2e
+    style UI fill:#0f3460
+```
+
+### Database Schema
+
+```mermaid
+erDiagram
+    telemetry_sessions ||--o{ chat_messages : "has many"
+
+    telemetry_sessions {
+        uuid id PK
+        timestamp created_at
+        string track_name
+        string file_name
+        string file_path
+        float theoretical_time
+        jsonb sector_stats
+        jsonb chart_data
+    }
+
+    chat_messages {
+        uuid id PK
+        uuid session_id FK
+        timestamp created_at
+        string role
+        text content
+    }
+```
+
+### API Routes Data Flow
+
+```mermaid
+graph LR
+    subgraph Upload["/api/upload"]
+        U1[Receive FormData]
+        U2[Validate CSV]
+        U3[Parse & Analyze]
+        U4[Store Session]
+        U5[Generate AI Analysis]
+        U6[Return Results]
+
+        U1 --> U2 --> U3 --> U4 --> U5 --> U6
+    end
+
+    subgraph Chat["/api/chat"]
+        C1[Receive Message]
+        C2[Fetch Session Context]
+        C3[Build AI Prompt]
+        C4[Stream Response]
+        C5[Store Message]
+
+        C1 --> C2 --> C3 --> C4 --> C5
+    end
+
+    subgraph History["/api/chat/history"]
+        H1[Receive Session ID]
+        H2[Query Messages]
+        H3[Return History]
+
+        H1 --> H2 --> H3
+    end
+
+    Upload -.->|sessionId| Chat
+    Upload -.->|sessionId| History
+
+    style Upload fill:#16213e
+    style Chat fill:#1a1a2e
+    style History fill:#0f3460
+```
+
+### Telemetry Processing Pipeline
+
+```mermaid
+flowchart TD
+    Start([CSV File]) --> Parse[Parse CSV with PapaParse]
+    Parse --> Validate{Valid Data?}
+
+    Validate -->|No| Error1[Throw Error:<br/>No telemetry data]
+    Validate -->|Yes| DetectLaps[Detect Lap Boundaries<br/>Distance: 3000m → 200m]
+
+    DetectLaps --> HasLaps{Laps Found?}
+    HasLaps -->|No| Error2[Throw Error:<br/>No valid laps detected]
+    HasLaps -->|Yes| ExtractSectors[Extract Sectors from Each Lap<br/>S1, S2, S3, S4]
+
+    ExtractSectors --> FilterDrafting{Check Drafting<br/>Speed > 162 km/h<br/>in corners?}
+    FilterDrafting -->|Yes| Skip[Skip Sector]
+    FilterDrafting -->|No| Compare[Compare Sector Times]
+
+    Skip --> NextSector{More Sectors?}
+    Compare --> FindBest[Track Best Sector Time]
+    FindBest --> NextSector
+
+    NextSector -->|Yes| ExtractSectors
+    NextSector -->|No| HasBestSectors{Found Valid<br/>Sectors?}
+
+    HasBestSectors -->|No| Error3[Throw Error:<br/>No valid sectors]
+    HasBestSectors -->|Yes| Calculate[Calculate Theoretical Time<br/>Sum of Best Sectors]
+
+    Calculate --> GenerateChart[Generate Chart Data<br/>{distance, speed, sector}[]]
+    GenerateChart --> GenerateStats[Generate Sector Stats<br/>{time, lap, gain, avgSpeed}[]]
+
+    GenerateStats --> Return([Return PerfectLapResult])
+
+    style Start fill:#4ecca3
+    style Return fill:#4ecca3
+    style Error1 fill:#ff6b6b
+    style Error2 fill:#ff6b6b
+    style Error3 fill:#ff6b6b
+    style FilterDrafting fill:#ffd93d
+    style HasLaps fill:#ffd93d
+    style HasBestSectors fill:#ffd93d
+    style Validate fill:#ffd93d
+```
+
 ## Project Structure
 
 ```
