@@ -35,7 +35,42 @@ function parseTelemetryCSV(csvContent: string): TelemetryRow[] {
     console.warn('CSV parsing warnings:', parseResult.errors);
   }
 
-  return parseResult.data.map((row: any) => ({
+  // Validate required columns exist
+  const requiredColumns = ['timestamp', 'Laptrigger_lapdist_dls', 'Speed', 'Steering_Angle', 'pbrake_f', 'aps'];
+  const headers = parseResult.meta.fields || [];
+
+  // Check for exact matches first
+  const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+
+  if (missingColumns.length > 0) {
+    console.error('CSV Validation Error:');
+    console.error('  Expected columns:', requiredColumns.join(', '));
+    console.error('  Found columns:', headers.join(', '));
+    console.error('  Missing columns:', missingColumns.join(', '));
+
+    // Try to find similar column names (case-insensitive)
+    const suggestions: string[] = [];
+    for (const missing of missingColumns) {
+      const similar = headers.find(h => h.toLowerCase() === missing.toLowerCase());
+      if (similar) {
+        suggestions.push(`  - Did you mean "${similar}" instead of "${missing}"?`);
+      }
+    }
+
+    if (suggestions.length > 0) {
+      console.error('Suggestions:');
+      suggestions.forEach(s => console.error(s));
+    }
+
+    throw new Error(
+      `CSV file is missing required columns: ${missingColumns.join(', ')}. ` +
+      `Found columns: ${headers.join(', ')}. ` +
+      `Column names are case-sensitive.`
+    );
+  }
+
+  // Parse and validate data
+  const parsedData = parseResult.data.map((row: any, index: number) => ({
     timestamp: Number(row.timestamp) || 0,
     Laptrigger_lapdist_dls: Number(row.Laptrigger_lapdist_dls) || 0,
     Speed: Number(row.Speed) || 0,
@@ -43,6 +78,35 @@ function parseTelemetryCSV(csvContent: string): TelemetryRow[] {
     pbrake_f: Number(row.pbrake_f) || 0,
     aps: Number(row.aps) || 0,
   }));
+
+  // Validate that we have actual data (not all zeros)
+  if (parsedData.length > 0) {
+    const sampleSize = Math.min(10, parsedData.length);
+    const samples = parsedData.slice(0, sampleSize);
+
+    const hasValidTimestamps = samples.some(row => row.timestamp > 0);
+    const hasValidSpeeds = samples.some(row => row.Speed > 0);
+    const hasValidDistances = samples.some(row => row.Laptrigger_lapdist_dls > 0);
+
+    if (!hasValidTimestamps || !hasValidSpeeds || !hasValidDistances) {
+      console.warn('Data Quality Warning:');
+      console.warn('  Sample data (first row):', parsedData[0]);
+      console.warn('  Has valid timestamps:', hasValidTimestamps);
+      console.warn('  Has valid speeds:', hasValidSpeeds);
+      console.warn('  Has valid distances:', hasValidDistances);
+
+      throw new Error(
+        'CSV data appears to be invalid - all values are zero or empty. ' +
+        'Please check that your CSV file contains actual telemetry data.'
+      );
+    }
+
+    console.log('CSV Validation Success:');
+    console.log('  Rows parsed:', parsedData.length);
+    console.log('  Sample data (first row):', parsedData[0]);
+  }
+
+  return parsedData;
 }
 
 function detectLaps(data: TelemetryRow[]): ParsedLap[] {
