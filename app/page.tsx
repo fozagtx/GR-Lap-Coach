@@ -209,64 +209,6 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="section-spacing abstract-wave relative">
-            <div className="absolute inset-0 bg-gradient-to-b from-[#05060F]/80 to-[#0A0D1C]/90"></div>
-            <div className="container-custom relative z-10">
-              <p className="text-xs md:text-sm uppercase tracking-wider text-cyan-400 mb-4">CORE FEATURES</p>
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-12 md:mb-16 text-white">
-                What makes <span className="italic font-light">Prometheus V3</span>
-                <br />
-                unstoppable
-              </h2>
-
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-                <div>
-                  <h3 className="text-lg md:text-xl font-bold mb-2 text-white">Robust and fast AI inference</h3>
-                  <p className="text-xs md:text-sm text-gray-300">
-                    Process thousands of data points per second with our optimized engine
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-lg md:text-xl font-bold mb-2 text-white">Multi-session history</h3>
-                  <p className="text-xs md:text-sm text-gray-300">
-                    Track performance across multiple sessions and compare improvements
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-lg md:text-xl font-bold mb-2 text-white">Insightful benchmarks</h3>
-                  <p className="text-xs md:text-sm text-gray-300">
-                    See exactly where time is being gained or lost in each sector
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-lg md:text-xl font-bold mb-2 text-white">Zero-hallucination coaching</h3>
-                  <p className="text-xs md:text-sm text-gray-300">
-                    AI analysis grounded in your actual telemetry data, not generic advice
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-
-          <section className="section-spacing electric-gradient relative overflow-hidden">
-            <div className="absolute inset-0 wave-pattern opacity-30"></div>
-            <div className="container-custom relative z-10">
-              <div className="max-w-4xl">
-                <p className="text-xs md:text-sm uppercase tracking-wider text-white/80 mb-4">START NOW</p>
-                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-white">
-                  Join the <span className="italic font-light">revolution</span>
-                </h2>
-                <p className="text-base md:text-lg text-white/90 mb-8">
-                  Experience the future of racing telemetry analysis. Upload your first CSV file and discover
-                  insights that will transform your performance on track.
-                </p>
-                <button onClick={() => setShowAnalysis(true)} className="btn-primary text-base md:text-lg px-8 md:px-10 py-3 md:py-4">
-                  Start Analyzing
-                </button>
-              </div>
-            </div>
-          </section>
 
           <footer className="border-t border-white/10 py-8">
             <div className="container-custom">
@@ -284,12 +226,13 @@ export default function Home() {
         <div className="pt-24 pb-12 min-h-screen">
           <div className="container-custom">
             <div className="mb-8">
-              <button
+              <Button
                 onClick={() => setShowAnalysis(false)}
-                className="text-[#89D3FF] hover:text-white transition-colors flex items-center gap-2"
+                variant="outline"
+                className="text-[#89D3FF] hover:text-white transition-colors"
               >
                 ← Back to Home
-              </button>
+              </Button>
             </div>
 
             {!result ? (
