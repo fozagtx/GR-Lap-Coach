@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react';
 import { Upload, File, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { GradientButton } from '@/components/ui/gradient-button';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface FileUploadProps {
@@ -83,9 +82,9 @@ export function FileUpload({ onFileSelect, selectedFile, onClearFile }: FileUplo
             <p className="mb-2 text-xl font-semibold text-white">Drop your CSV file here</p>
             <p className="mb-6 text-sm text-[#8A8FA3]">or</p>
             <label htmlFor="file-input">
-              <GradientButton className="cursor-pointer" asChild>
+              <Button className="cursor-pointer" asChild>
                 <span>Browse Files</span>
-              </GradientButton>
+              </Button>
               <input
                 id="file-input"
                 type="file"
