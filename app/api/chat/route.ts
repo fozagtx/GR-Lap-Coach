@@ -57,6 +57,39 @@ export async function POST(request: NextRequest) {
       apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
     });
 
+    // Validate that we have valid telemetry data before building context
+    if (!sessionData.sector_stats || sessionData.sector_stats.length === 0) {
+      return new Response(
+        JSON.stringify({
+          error: 'No sector data available for this session. Please upload valid telemetry data.',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Check if all values are zero (invalid data)
+    const hasValidData = sessionData.sector_stats.some(
+      (stat: any) => stat.bestTime > 0 && stat.avgSpeed > 0
+    );
+
+    if (!hasValidData || sessionData.theoretical_time <= 0) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'The telemetry data appears to be invalid (all values are zero). ' +
+            'This usually means the CSV file had incorrect column names or formatting. ' +
+            'Please re-upload your telemetry data with the correct format.',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const contextMessage = `
 You are analyzing telemetry data for this session:
 
@@ -67,7 +100,7 @@ Sector Stats:
 ${sessionData.sector_stats
   .map(
     (stat: any) =>
-      `- ${stat.sectorName}: ${formatLapTime(stat.bestTime)} (Lap ${stat.lapNumber}) | Avg Speed: ${stat.avgSpeed.toFixed(1)} km/h | Time Gain: ${stat.timeGain.toFixed(3)}s`
+      `- ${stat.sectorName}: ${formatLapTime(stat.bestTime ?? 0)} (Lap ${stat.lapNumber ?? 0}) | Avg Speed: ${(stat.avgSpeed ?? 0).toFixed(1)} km/h | Time Gain: ${(stat.timeGain ?? 0).toFixed(3)}s`
   )
   .join('\n')}
 
@@ -86,19 +119,17 @@ The driver is asking questions about their performance. Use this telemetry conte
 - Reference specific sector times and speeds from the data
 - Keep responses concise (under 150 words) but informative
 
-## DATA HANDLING
-- Work with available lap-level data (sector times, speeds, lap numbers)
-- Accept data even if there are minor inconsistencies
-- Focus on actionable insights rather than data validation
-- Be transparent about limitations in the data
+## DATA QUALITY
+- All telemetry data has been validated before reaching you
+- You can trust that the data provided is accurate and meaningful
+- Focus on actionable insights and coaching advice
+- Be transparent about limitations when data is insufficient for specific analysis
 
 ## RESPONSE STYLE
 - Ground all advice in actual telemetry data provided
 - Prioritize practical, implementable recommendations
 - Use specific metrics and numbers when discussing performance
-- Acknowledge when data is insufficient for detailed analysis
-
-Never reject or complain about data quality - work with what you have to provide maximum value.`,
+- Provide encouragement while identifying clear areas for improvement`,
       },
       {
         role: 'user',
