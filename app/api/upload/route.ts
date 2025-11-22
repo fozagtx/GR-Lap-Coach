@@ -60,6 +60,12 @@ export async function POST(request: NextRequest) {
           aiAnalysis: 'OpenAI API key not configured. Upload successful, but AI analysis unavailable.',
           theoreticalTime: perfectLap.theoreticalTime,
           sectorStats: perfectLap.sectorStats,
+          consistency: perfectLap.consistency,
+          improvementAreas: perfectLap.improvementAreas,
+          brakingZones: perfectLap.brakingZones,
+          accelerationZones: perfectLap.accelerationZones,
+          cornerAnalysis: perfectLap.cornerAnalysis,
+          speedDeficits: perfectLap.speedDeficits,
         },
         { status: 200 }
       );
@@ -69,11 +75,35 @@ export async function POST(request: NextRequest) {
       apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
     });
 
+    const consistencyInfo = perfectLap.consistency
+      ? `
+Consistency Metrics:
+- Best Lap: ${formatLapTime(perfectLap.consistency.bestLapTime)}
+- Average Lap: ${formatLapTime(perfectLap.consistency.avgLapTime)}
+- Worst Lap: ${formatLapTime(perfectLap.consistency.worstLapTime)}
+- Consistency Score: ${perfectLap.consistency.consistencyScore.toFixed(0)}/100
+- Standard Deviation: ${perfectLap.consistency.stdDeviation.toFixed(3)}s
+`
+      : '';
+
+    const improvementInfo = perfectLap.improvementAreas && perfectLap.improvementAreas.length > 0
+      ? `
+Priority Improvement Areas:
+${perfectLap.improvementAreas
+  .slice(0, 5)
+  .map(
+    (area, idx) =>
+      `${idx + 1}. [${area.priority.toUpperCase()}] ${area.area} (${area.sector}): ${area.description}\n   → ${area.recommendation}`
+  )
+  .join('\n')}
+`
+      : '';
+
     const summaryText = `
 Perfect Lap Analysis for Track: ${trackName || 'COTA'}
 
 Theoretical Best Lap Time: ${formatLapTime(perfectLap.theoreticalTime)}
-
+${consistencyInfo}
 Sector Breakdown:
 ${perfectLap.sectorStats
   .map(
@@ -81,11 +111,11 @@ ${perfectLap.sectorStats
       `- ${stat.sectorName}: Best Time ${formatLapTime(stat.bestTime)} from Lap ${stat.lapNumber}. Average Speed: ${stat.avgSpeed.toFixed(1)} km/h. Potential Time Gain: ${stat.timeGain.toFixed(3)}s compared to average sector time.`
   )
   .join('\n')}
-
+${improvementInfo}
 Total Data Points: ${perfectLap.chartData.length}
 Number of Sectors Analyzed: ${perfectLap.sectorStats.length}
 
-Provide specific, actionable coaching advice based on this real telemetry data.
+Based on the improvement areas identified, provide specific, actionable coaching advice focusing on the highest priority areas where the driver can gain time.
     `.trim();
 
     const completion = await openai.chat.completions.create({
@@ -93,45 +123,40 @@ Provide specific, actionable coaching advice based on this real telemetry data.
       messages: [
         {
           role: 'system',
-          content: `You are an expert motorsport racing coach specializing in Toyota GR86 Cup racing. You analyze lap and sector data to provide actionable coaching advice.
+          content: `You are an expert motorsport racing coach specializing in Toyota GR86 Cup racing. You analyze detailed telemetry data to provide specific, actionable coaching advice.
 
 ## DATA YOU RECEIVE
-You work with LAP-LEVEL data containing:
-- Lap times and lap numbers
-- Sector times in seconds
-- Average speed and top speed per lap
-- Distance-based telemetry markers
-
-## CRITICAL: DATA VALIDATION RULES
-When validating lap times:
-1. Calculate expected lap time from sector sum
-2. Compare to reported lap time
-3. If difference < 2.0 seconds: Accept and proceed
-4. If difference > 2.0 seconds: Note discrepancy but CONTINUE analysis
-5. NEVER reject data or throw errors about invalid lap times
+You work with comprehensive telemetry data including:
+- Lap times, sector times, and lap numbers
+- Consistency metrics (standard deviation, score out of 100)
+- Prioritized improvement areas with specific locations and time losses
+- Braking zone analysis with entry/exit speeds
+- Corner speed analysis with minimum speeds
+- Speed deficit zones showing where time is lost
+- Average speeds and distance markers
 
 ## YOUR ANALYSIS CAPABILITIES
-✓ Lap time consistency analysis
+✓ Lap-to-lap consistency analysis with scoring
 ✓ Sector-by-sector performance breakdown
-✓ Theoretical best lap calculations
-✓ Race pace trends
-✓ Focus area identification
+✓ Specific improvement area identification with priorities
+✓ Braking point consistency evaluation
+✓ Corner speed optimization opportunities
+✓ Speed deficit analysis at specific track locations
 
 ## RESPONSE FORMAT
-Structure responses with:
-- Performance summary with specific metrics
-- Sector analysis with best/avg times and gaps
-- Key findings (2-3 bullet points)
-- Actionable recommendations (prioritized 1-3)
-- Data quality notes if needed
+Provide concise, specific coaching focused on:
+1. Top 2-3 priority improvement areas from the data
+2. Specific locations (sectors/distances) where time is being lost
+3. Concrete actions (e.g., "Brake 20m later", "Carry 5 km/h more through corner")
+4. Consistency notes if score < 70/100
 
-## ERROR HANDLING
-- Missing data: Work with what's available
-- Outliers: Note but include in analysis
-- Validation failures: Proceed with warning
-- Be transparent about limitations
+## COACHING STYLE
+- Be specific with numbers and locations
+- Prioritize high-impact improvements first
+- Reference the improvement areas provided in the data
+- Keep total response under 200 words but be precise
 
-Focus on extracting maximum value from the data while being honest about what you can and cannot determine. Keep response under 200 words.`,
+Focus on actionable, specific guidance that the driver can immediately apply. Reference exact sectors, speeds, and time losses from the data.`,
         },
         {
           role: 'user',
@@ -157,6 +182,12 @@ Focus on extracting maximum value from the data while being honest about what yo
       aiAnalysis,
       theoreticalTime: perfectLap.theoreticalTime,
       sectorStats: perfectLap.sectorStats,
+      consistency: perfectLap.consistency,
+      improvementAreas: perfectLap.improvementAreas,
+      brakingZones: perfectLap.brakingZones,
+      accelerationZones: perfectLap.accelerationZones,
+      cornerAnalysis: perfectLap.cornerAnalysis,
+      speedDeficits: perfectLap.speedDeficits,
     });
   } catch (error: any) {
     console.error('Upload error:', error);

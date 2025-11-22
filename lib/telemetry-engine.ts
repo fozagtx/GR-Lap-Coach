@@ -7,6 +7,12 @@ import type {
   Sector,
   SectorStats,
   PerfectLapResult,
+  ConsistencyMetrics,
+  ImprovementArea,
+  BrakingZone,
+  AccelerationZone,
+  CornerAnalysis,
+  SpeedDeficit,
 } from '@/types/telemetry';
 
 const COTA_SECTORS = [
@@ -134,6 +140,302 @@ function isDrafting(sector: Sector): boolean {
   return sector.maxSpeed > DRAFTING_SPEED_THRESHOLD && isCornerSector(sector.name);
 }
 
+function analyzeConsistency(laps: ParsedLap[]): ConsistencyMetrics {
+  const lapTimes = laps.map((lap) => lap.lapTime);
+  const avgLapTime = lapTimes.reduce((a, b) => a + b, 0) / lapTimes.length;
+  const bestLapTime = Math.min(...lapTimes);
+  const worstLapTime = Math.max(...lapTimes);
+
+  const variance =
+    lapTimes.reduce((sum, time) => sum + Math.pow(time - avgLapTime, 2), 0) / lapTimes.length;
+  const stdDeviation = Math.sqrt(variance);
+
+  const lapTimeVariation = lapTimes.map((time) => time - bestLapTime);
+
+  const consistencyScore = Math.max(0, Math.min(100, 100 - stdDeviation * 10));
+
+  return {
+    avgLapTime,
+    bestLapTime,
+    worstLapTime,
+    stdDeviation,
+    lapTimeVariation,
+    consistencyScore,
+  };
+}
+
+function analyzeBrakingZones(laps: ParsedLap[]): BrakingZone[] {
+  const brakingZones: BrakingZone[] = [];
+
+  for (const lap of laps) {
+    let inBrakingZone = false;
+    let zoneStartIndex = 0;
+
+    for (let i = 0; i < lap.data.length; i++) {
+      const row = lap.data[i];
+      const isBraking = row.pbrake_f > 0.3;
+
+      if (isBraking && !inBrakingZone) {
+        zoneStartIndex = i;
+        inBrakingZone = true;
+      } else if (!isBraking && inBrakingZone) {
+        if (i - zoneStartIndex > 3) {
+          const zoneData = lap.data.slice(zoneStartIndex, i);
+          const entrySpeed = zoneData[0].Speed;
+          const exitSpeed = zoneData[zoneData.length - 1].Speed;
+          const avgBrakePressure =
+            zoneData.reduce((sum, r) => sum + r.pbrake_f, 0) / zoneData.length;
+          const distance = zoneData[Math.floor(zoneData.length / 2)].Laptrigger_lapdist_dls;
+
+          const sector = COTA_SECTORS.find((s) => distance >= s.start && distance < s.end);
+
+          brakingZones.push({
+            sector: sector?.name || 'Unknown',
+            distance,
+            entrySpeed,
+            exitSpeed,
+            brakePressure: avgBrakePressure,
+            lapNumber: lap.lapNumber,
+          });
+        }
+        inBrakingZone = false;
+      }
+    }
+  }
+
+  return brakingZones;
+}
+
+function analyzeAccelerationZones(laps: ParsedLap[]): AccelerationZone[] {
+  const accelZones: AccelerationZone[] = [];
+
+  for (const lap of laps) {
+    let inAccelZone = false;
+    let zoneStartIndex = 0;
+
+    for (let i = 0; i < lap.data.length; i++) {
+      const row = lap.data[i];
+      const isAccelerating = row.aps > 0.7 && row.pbrake_f < 0.1;
+
+      if (isAccelerating && !inAccelZone) {
+        zoneStartIndex = i;
+        inAccelZone = true;
+      } else if (!isAccelerating && inAccelZone) {
+        if (i - zoneStartIndex > 3) {
+          const zoneData = lap.data.slice(zoneStartIndex, i);
+          const entrySpeed = zoneData[0].Speed;
+          const exitSpeed = zoneData[zoneData.length - 1].Speed;
+          const avgThrottle = zoneData.reduce((sum, r) => sum + r.aps, 0) / zoneData.length;
+          const distance = zoneData[Math.floor(zoneData.length / 2)].Laptrigger_lapdist_dls;
+
+          const sector = COTA_SECTORS.find((s) => distance >= s.start && distance < s.end);
+
+          accelZones.push({
+            sector: sector?.name || 'Unknown',
+            distance,
+            entrySpeed,
+            exitSpeed,
+            avgThrottle,
+            lapNumber: lap.lapNumber,
+          });
+        }
+        inAccelZone = false;
+      }
+    }
+  }
+
+  return accelZones;
+}
+
+function analyzeCorners(laps: ParsedLap[]): CornerAnalysis[] {
+  const corners: CornerAnalysis[] = [];
+
+  for (const lap of laps) {
+    for (const sectorDef of COTA_SECTORS) {
+      const sectorData = lap.data.filter(
+        (row) =>
+          row.Laptrigger_lapdist_dls >= sectorDef.start &&
+          row.Laptrigger_lapdist_dls < sectorDef.end
+      );
+
+      if (sectorData.length < 5) continue;
+
+      const minSpeedRow = sectorData.reduce((min, row) => (row.Speed < min.Speed ? row : min));
+      const minSpeedIndex = sectorData.indexOf(minSpeedRow);
+
+      const entrySpeed = sectorData[0].Speed;
+      const exitSpeed = sectorData[sectorData.length - 1].Speed;
+
+      corners.push({
+        sector: sectorDef.name,
+        distance: minSpeedRow.Laptrigger_lapdist_dls,
+        minSpeed: minSpeedRow.Speed,
+        lapNumber: lap.lapNumber,
+        entrySpeed,
+        exitSpeed,
+      });
+    }
+  }
+
+  return corners;
+}
+
+function analyzeSpeedDeficits(
+  laps: ParsedLap[],
+  bestSectors: Sector[]
+): SpeedDeficit[] {
+  const deficits: SpeedDeficit[] = [];
+
+  for (const bestSector of bestSectors) {
+    const sectorDef = COTA_SECTORS.find((s) => s.name === bestSector.name);
+    if (!sectorDef) continue;
+
+    const allSectorSpeeds: number[][] = [];
+
+    for (const lap of laps) {
+      const sectorData = lap.data.filter(
+        (row) =>
+          row.Laptrigger_lapdist_dls >= sectorDef.start &&
+          row.Laptrigger_lapdist_dls < sectorDef.end
+      );
+
+      if (sectorData.length > 0) {
+        allSectorSpeeds.push(sectorData.map((r) => r.Speed));
+      }
+    }
+
+    if (allSectorSpeeds.length < 2) continue;
+
+    const minLength = Math.min(...allSectorSpeeds.map((s) => s.length));
+
+    for (let i = 0; i < minLength; i += Math.floor(minLength / 5)) {
+      const speedsAtPoint = allSectorSpeeds.map((s) => s[i] || 0);
+      const avgSpeed = speedsAtPoint.reduce((a, b) => a + b, 0) / speedsAtPoint.length;
+      const bestSpeed = Math.max(...speedsAtPoint);
+      const speedLoss = bestSpeed - avgSpeed;
+
+      if (speedLoss > 5) {
+        const distance =
+          bestSector.data[Math.min(i, bestSector.data.length - 1)]?.Laptrigger_lapdist_dls ||
+          sectorDef.start;
+
+        deficits.push({
+          sector: bestSector.name,
+          distance,
+          speedLoss,
+          bestSpeed,
+          avgSpeed,
+          description: `${speedLoss.toFixed(1)} km/h slower than best at ${distance.toFixed(0)}m`,
+        });
+      }
+    }
+  }
+
+  return deficits;
+}
+
+function identifyImprovementAreas(
+  sectorStats: SectorStats[],
+  consistency: ConsistencyMetrics,
+  brakingZones: BrakingZone[],
+  accelerationZones: AccelerationZone[],
+  corners: CornerAnalysis[],
+  speedDeficits: SpeedDeficit[]
+): ImprovementArea[] {
+  const improvements: ImprovementArea[] = [];
+
+  for (const stat of sectorStats) {
+    if (stat.timeGain > 0.1) {
+      const deficit = speedDeficits.find((d) => d.sector === stat.sectorName);
+      const description = deficit
+        ? `Losing ${stat.timeGain.toFixed(3)}s in ${stat.sectorName}. ${deficit.description}.`
+        : `Losing ${stat.timeGain.toFixed(3)}s in ${stat.sectorName} compared to your best.`;
+
+      improvements.push({
+        area: `${stat.sectorName} Pace`,
+        sector: stat.sectorName,
+        timeLoss: stat.timeGain,
+        description,
+        recommendation: `Focus on maintaining higher minimum speeds through corners and earlier throttle application.`,
+        priority: stat.timeGain > 0.3 ? 'high' : stat.timeGain > 0.15 ? 'medium' : 'low',
+      });
+    }
+  }
+
+  if (consistency.consistencyScore < 70) {
+    improvements.push({
+      area: 'Consistency',
+      sector: 'All',
+      timeLoss: consistency.stdDeviation,
+      description: `Lap times vary by ${consistency.stdDeviation.toFixed(2)}s (score: ${consistency.consistencyScore.toFixed(0)}/100).`,
+      recommendation: `Work on repeatable reference points for braking and turn-in to improve consistency.`,
+      priority: 'high',
+    });
+  }
+
+  const brakingVariance = new Map<string, number[]>();
+  for (const zone of brakingZones) {
+    const key = `${zone.sector}-${Math.floor(zone.distance / 100) * 100}`;
+    if (!brakingVariance.has(key)) {
+      brakingVariance.set(key, []);
+    }
+    brakingVariance.get(key)!.push(zone.distance);
+  }
+
+  Array.from(brakingVariance.entries()).forEach(([key, distances]) => {
+    if (distances.length < 2) return;
+    const variance = Math.max(...distances) - Math.min(...distances);
+    if (variance > 30) {
+      const sector = key.split('-')[0];
+      improvements.push({
+        area: 'Braking Consistency',
+        sector,
+        timeLoss: variance / 100,
+        description: `Braking point varies by ${variance.toFixed(0)}m in ${sector}.`,
+        recommendation: `Establish fixed reference points for braking zones to improve consistency.`,
+        priority: 'medium',
+      });
+    }
+  });
+
+  const cornersByDistance = corners.reduce((acc, corner) => {
+    const key = `${corner.sector}-${Math.floor(corner.distance / 100) * 100}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(corner);
+    return acc;
+  }, {} as Record<string, CornerAnalysis[]>);
+
+  for (const [key, cornerGroup] of Object.entries(cornersByDistance)) {
+    if (cornerGroup.length < 2) continue;
+    const minSpeeds = cornerGroup.map((c) => c.minSpeed);
+    const bestMinSpeed = Math.max(...minSpeeds);
+    const avgMinSpeed = minSpeeds.reduce((a, b) => a + b, 0) / minSpeeds.length;
+    const speedDeficit = bestMinSpeed - avgMinSpeed;
+
+    if (speedDeficit > 3) {
+      const sector = cornerGroup[0].sector;
+      improvements.push({
+        area: 'Corner Speed',
+        sector,
+        timeLoss: speedDeficit / 50,
+        description: `Minimum speed ${speedDeficit.toFixed(1)} km/h lower than best in ${sector}.`,
+        recommendation: `Work on carrying more speed through the corner with smoother inputs and better line.`,
+        priority: speedDeficit > 8 ? 'high' : 'medium',
+      });
+    }
+  }
+
+  improvements.sort((a, b) => {
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    }
+    return b.timeLoss - a.timeLoss;
+  });
+
+  return improvements.slice(0, 8);
+}
+
 export function synthesizePerfectLap(trackId: string): PerfectLapResult {
   const csvPath = path.join(process.cwd(), 'public', 'data', `${trackId}.csv`);
 
@@ -213,11 +515,31 @@ export function synthesizePerfectLap(trackId: string): PerfectLapResult {
     }
   }
 
+  const consistency = analyzeConsistency(laps);
+  const brakingZones = analyzeBrakingZones(laps);
+  const accelerationZones = analyzeAccelerationZones(laps);
+  const corners = analyzeCorners(laps);
+  const speedDeficits = analyzeSpeedDeficits(laps, bestSectors);
+  const improvementAreas = identifyImprovementAreas(
+    sectorStats,
+    consistency,
+    brakingZones,
+    accelerationZones,
+    corners,
+    speedDeficits
+  );
+
   return {
     theoreticalTime,
     chartData,
     sectorStats,
     bestSectors,
+    consistency,
+    improvementAreas,
+    brakingZones,
+    accelerationZones,
+    cornerAnalysis: corners,
+    speedDeficits,
   };
 }
 
