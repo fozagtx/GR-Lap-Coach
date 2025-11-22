@@ -70,6 +70,9 @@ export default function Home() {
       }
 
       const data = await response.json();
+      console.log('Analysis result:', data);
+      console.log('Chart data length:', data.chartData?.length);
+      console.log('Sample chart data:', data.chartData?.slice(0, 5));
       setResult(data);
       setShowAnalysis(true);
     } catch (err: any) {
@@ -314,30 +317,43 @@ export default function Home() {
                 <Card className="bg-gray-900 border-2 border-gray-700">
                   <CardContent className="p-4 md:p-8">
                     <h3 className="text-xl md:text-2xl font-bold mb-6 text-white">Speed Trace</h3>
-                    <div className="h-64 md:h-96">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={result.chartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#3C4466" />
-                          <XAxis dataKey="distance" stroke="#8A8FA3" />
-                          <YAxis dataKey="speed" stroke="#8A8FA3" />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: '#0A0D1C',
-                              border: '1px solid #3C4466',
-                              borderRadius: '0.75rem',
-                            }}
-                            formatter={(value: any) => [`${value.toFixed(1)} km/h`, 'Speed']}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="speed"
-                            stroke="#5145F6"
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {result.chartData && result.chartData.length > 0 ? (
+                      <div className="h-64 md:h-96">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={result.chartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#3C4466" />
+                            <XAxis
+                              dataKey="distance"
+                              stroke="#8A8FA3"
+                              label={{ value: 'Distance (m)', position: 'insideBottom', offset: -5, fill: '#8A8FA3' }}
+                            />
+                            <YAxis
+                              stroke="#8A8FA3"
+                              label={{ value: 'Speed (km/h)', angle: -90, position: 'insideLeft', fill: '#8A8FA3' }}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: '#0A0D1C',
+                                border: '1px solid #3C4466',
+                                borderRadius: '0.75rem',
+                              }}
+                              formatter={(value: any) => [`${value.toFixed(1)} km/h`, 'Speed']}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="speed"
+                              stroke="#5145F6"
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-64 md:h-96 flex items-center justify-center">
+                        <p className="text-gray-400">No chart data available</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

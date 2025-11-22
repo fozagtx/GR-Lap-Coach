@@ -203,6 +203,10 @@ export function synthesizePerfectLapFromContent(csvContent: string): PerfectLapR
     }
   }
 
+  console.log('Generated chart data points:', chartData.length);
+  console.log('Best sectors found:', bestSectors.length);
+  console.log('Sample chart data:', chartData.slice(0, 5));
+
   return {
     theoreticalTime,
     chartData,
