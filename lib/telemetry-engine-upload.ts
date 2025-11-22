@@ -35,80 +35,69 @@ function parseTelemetryCSV(csvContent: string): TelemetryRow[] {
     console.warn('CSV parsing warnings:', parseResult.errors);
   }
 
-  // Validate required columns exist
-  const requiredColumns = ['timestamp', 'Laptrigger_lapdist_dls', 'Speed', 'Steering_Angle', 'pbrake_f', 'aps'];
+  // Flexible column mapping - intelligently map CSV columns to expected fields
   const headers = parseResult.meta.fields || [];
 
-  // Check for exact matches first
-  const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+  // Detect if this looks like a race results file (block obvious wrong files)
+  const raceResultsIndicators = ['POSITION', 'NUMBER', 'STATUS', 'LAPS', 'TOTAL_TIME', 'GAP_FIRST'];
+  const matchedIndicators = raceResultsIndicators.filter(indicator =>
+    headers.some(h => h.toUpperCase() === indicator)
+  );
 
-  if (missingColumns.length > 0) {
-    console.error('CSV Validation Error:');
-    console.error('  Expected columns:', requiredColumns.join(', '));
-    console.error('  Found columns:', headers.join(', '));
-    console.error('  Missing columns:', missingColumns.join(', '));
-
-    // Detect if this looks like a race results file
-    const raceResultsIndicators = ['POSITION', 'NUMBER', 'STATUS', 'LAPS', 'TOTAL_TIME', 'GAP_FIRST'];
-    const matchedIndicators = raceResultsIndicators.filter(indicator =>
-      headers.some(h => h.toUpperCase() === indicator)
-    );
-
-    if (matchedIndicators.length >= 3) {
-      throw new Error(
-        `The uploaded CSV appears to be a race results/standings file, not telemetry data.\n\n` +
-        `This application requires RAW TELEMETRY DATA from your car's ECU with these columns:\n` +
-        `  - timestamp (Time on ECU)\n` +
-        `  - Laptrigger_lapdist_dls (Distance from start/finish in meters)\n` +
-        `  - Speed (Vehicle speed in km/h)\n` +
-        `  - Steering_Angle (Steering input)\n` +
-        `  - pbrake_f (Front brake pressure)\n` +
-        `  - aps (Accelerator pedal position)\n\n` +
-        `Your file has: ${headers.join(', ')}\n\n` +
-        `Please upload the telemetry data file from your car's data logger, not the race results file.`
-      );
-    }
-
-    // Try to find similar column names (case-insensitive)
-    const suggestions: string[] = [];
-    for (const missing of missingColumns) {
-      const similar = headers.find(h => h.toLowerCase() === missing.toLowerCase());
-      if (similar) {
-        suggestions.push(`  - Did you mean "${similar}" instead of "${missing}"?`);
-      }
-    }
-
-    if (suggestions.length > 0) {
-      console.error('Suggestions:');
-      suggestions.forEach(s => console.error(s));
-
-      throw new Error(
-        `CSV file has incorrect column names (case-sensitive):\n` +
-        suggestions.join('\n') + '\n\n' +
-        `Expected: ${requiredColumns.join(', ')}\n` +
-        `Found: ${headers.join(', ')}`
-      );
-    }
-
+  if (matchedIndicators.length >= 3) {
     throw new Error(
-      `CSV file is missing required columns: ${missingColumns.join(', ')}.\n\n` +
-      `Required columns:\n  - ${requiredColumns.join('\n  - ')}\n\n` +
-      `Found columns:\n  - ${headers.join('\n  - ')}\n\n` +
-      `Please ensure you're uploading a telemetry data file with the correct format.`
+      `The uploaded CSV appears to be a race results/standings file, not telemetry data.\n\n` +
+      `This application requires RAW TELEMETRY DATA from your car's ECU.\n` +
+      `Your file has: ${headers.join(', ')}\n\n` +
+      `Please upload the telemetry data file from your car's data logger, not the race results file.`
     );
   }
 
-  // Parse and validate data
+  // Intelligent column mapping with fuzzy matching
+  const findColumn = (patterns: string[]): string | null => {
+    for (const pattern of patterns) {
+      // Try exact match first
+      const exact = headers.find(h => h === pattern);
+      if (exact) return exact;
+
+      // Try case-insensitive match
+      const caseInsensitive = headers.find(h => h.toLowerCase() === pattern.toLowerCase());
+      if (caseInsensitive) return caseInsensitive;
+
+      // Try partial match
+      const partial = headers.find(h =>
+        h.toLowerCase().includes(pattern.toLowerCase()) ||
+        pattern.toLowerCase().includes(h.toLowerCase())
+      );
+      if (partial) return partial;
+    }
+    return null;
+  };
+
+  const columnMap = {
+    timestamp: findColumn(['timestamp', 'time', 'meta_time', 't', 'Time']),
+    Laptrigger_lapdist_dls: findColumn(['Laptrigger_lapdist_dls', 'lap_distance', 'distance', 'dist', 'lap_dist']),
+    Speed: findColumn(['Speed', 'speed', 'velocity', 'vel', 'spd']),
+    Steering_Angle: findColumn(['Steering_Angle', 'steering', 'steer', 'angle', 'steering_angle']),
+    pbrake_f: findColumn(['pbrake_f', 'brake', 'brake_pressure', 'pbrake', 'front_brake']),
+    aps: findColumn(['aps', 'throttle', 'accel', 'accelerator', 'gas']),
+  };
+
+  console.log('CSV Column Mapping:');
+  console.log('  Available columns:', headers.join(', '));
+  console.log('  Mapped columns:', JSON.stringify(columnMap, null, 2));
+
+  // Parse and validate data using flexible column mapping
   const parsedData = parseResult.data.map((row: any, index: number) => ({
-    timestamp: Number(row.timestamp) || 0,
-    Laptrigger_lapdist_dls: Number(row.Laptrigger_lapdist_dls) || 0,
-    Speed: Number(row.Speed) || 0,
-    Steering_Angle: Number(row.Steering_Angle) || 0,
-    pbrake_f: Number(row.pbrake_f) || 0,
-    aps: Number(row.aps) || 0,
+    timestamp: Number(row[columnMap.timestamp || 'timestamp']) || 0,
+    Laptrigger_lapdist_dls: Number(row[columnMap.Laptrigger_lapdist_dls || 'Laptrigger_lapdist_dls']) || 0,
+    Speed: Number(row[columnMap.Speed || 'Speed']) || 0,
+    Steering_Angle: Number(row[columnMap.Steering_Angle || 'Steering_Angle']) || 0,
+    pbrake_f: Number(row[columnMap.pbrake_f || 'pbrake_f']) || 0,
+    aps: Number(row[columnMap.aps || 'aps']) || 0,
   }));
 
-  // Validate that we have actual data (not all zeros)
+  // Validate that we have actual data (flexible validation)
   if (parsedData.length > 0) {
     const sampleSize = Math.min(10, parsedData.length);
     const samples = parsedData.slice(0, sampleSize);
@@ -117,22 +106,32 @@ function parseTelemetryCSV(csvContent: string): TelemetryRow[] {
     const hasValidSpeeds = samples.some(row => row.Speed > 0);
     const hasValidDistances = samples.some(row => row.Laptrigger_lapdist_dls > 0);
 
-    if (!hasValidTimestamps || !hasValidSpeeds || !hasValidDistances) {
-      console.warn('Data Quality Warning:');
-      console.warn('  Sample data (first row):', parsedData[0]);
-      console.warn('  Has valid timestamps:', hasValidTimestamps);
-      console.warn('  Has valid speeds:', hasValidSpeeds);
-      console.warn('  Has valid distances:', hasValidDistances);
+    console.log('CSV Data Quality Check:');
+    console.log('  Rows parsed:', parsedData.length);
+    console.log('  Sample data (first row):', parsedData[0]);
+    console.log('  Has valid timestamps:', hasValidTimestamps);
+    console.log('  Has valid speeds:', hasValidSpeeds);
+    console.log('  Has valid distances:', hasValidDistances);
 
+    if (!hasValidTimestamps && !hasValidSpeeds && !hasValidDistances) {
       throw new Error(
-        'CSV data appears to be invalid - all values are zero or empty. ' +
+        'CSV data appears to be completely empty or invalid. ' +
         'Please check that your CSV file contains actual telemetry data.'
       );
     }
 
-    console.log('CSV Validation Success:');
-    console.log('  Rows parsed:', parsedData.length);
-    console.log('  Sample data (first row):', parsedData[0]);
+    // Warn about missing data but allow processing to continue
+    if (!hasValidTimestamps) {
+      console.warn('⚠️  Warning: No valid timestamp data found. Time-based analysis may be limited.');
+    }
+    if (!hasValidSpeeds) {
+      console.warn('⚠️  Warning: No valid speed data found. Speed analysis may be limited.');
+    }
+    if (!hasValidDistances) {
+      console.warn('⚠️  Warning: No valid distance/lap data found. Lap detection may not work correctly.');
+    }
+
+    console.log('✓ CSV loaded successfully - proceeding with available data');
   }
 
   return parsedData;
